@@ -1,12 +1,20 @@
-import { api } from '../utils/axios'
+import { api } from "../utils/axios";
 
-export const login = async(token)=>{
-    try{
-        const {data}= await api.post("/api/auth/login",{token})
-        return data
+export const login = async (token) => {
+  try {
+    const { data } = await api.post(
+      "/api/auth/login",
+      { token }
+    );
 
-    }catch(error){
-        console.log(error)
-        return null
-    }
-}
+    return data;
+
+  } catch (error) {
+    console.error(
+      "Login Error:",
+      error.response?.data || error.message
+    );
+
+    return null;
+  }
+};
