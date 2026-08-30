@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 
-const userSchema = new mongooose.Schema({
+const userSchema = new mongoose.Schema({
     firebaseUid:{
         type:String,
         required:true,

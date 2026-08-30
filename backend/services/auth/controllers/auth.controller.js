@@ -1,4 +1,4 @@
-import { app } from "../config/firebase"
+import { app } from "../config/firebase.js"
 import { getAuth } from 'firebase-admin/auth'
 import crypto from 'crypto'
 import redis from '../../../shared/redis/redis.js'
