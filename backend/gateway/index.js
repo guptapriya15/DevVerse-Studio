@@ -7,6 +7,7 @@ import morgan from 'morgan'
 import proxy from 'express-http-proxy'
 import { protect } from './middleware/protect.js'
 import { getCurrentUser } from './controllers/user.controller.js'
+import { proxyWithHeader } from './utils/proxyWithHeader.js'
 
 const app = express()
 
@@ -21,6 +22,7 @@ app.use(cookieParser())
 app.use(morgan("dev"))
 
 app.use("/api/auth",proxy(process.env.AUTH_SERVICE))
+app.use("/api/project",protect,proxyWithHeader(process.env.PROJECT_SERVICE))
 
 app.get("/api/me",protect,getCurrentUser)
 
