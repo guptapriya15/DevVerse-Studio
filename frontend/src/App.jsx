@@ -3,11 +3,8 @@ import { useDispatch } from "react-redux";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { me } from "./features/me";
 import Dashboard from "./pages/Dashboard";
-import {
-  setAuthError,
-  setAuthLoading,
-  setUserData,
-} from "./redux/userSlice";
+import { setAuthError, setAuthLoading, setUserData } from "./redux/userSlice";
+import ProjectPage from "./pages/ProjectPage";
 
 function App() {
   const dispatch = useDispatch();
@@ -48,6 +45,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/project/:id" element={<ProjectPage />} />
       </Routes>
     </BrowserRouter>
   );

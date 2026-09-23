@@ -29,6 +29,7 @@ export const fetchProjects = createAsyncThunk(
 
 const initialState = {
   projects: [],
+  currentProject: null,
   loading: false,
   error: null,
   activeSession: null,
@@ -65,6 +66,9 @@ const projectSlice = createSlice({
       if (project) {
         project.starred = !project.starred;
       }
+    },
+    setCurrentProject: (state, action) => {
+      state.currentProject = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -109,6 +113,7 @@ export const {
   clearProjects,
   updateProject,
   setDeleteProject,
+  setCurrentProject,
 } = projectSlice.actions;
 
 export default projectSlice.reducer;

@@ -1,12 +1,16 @@
 import { Star, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { deleteProject, toggleStar } from "../features/project";
 
 const getErrorMessage = (error) =>
-  error.response?.data?.message || error.message || "Unable to update the project.";
+  error.response?.data?.message ||
+  error.message ||
+  "Unable to update the project.";
 
 function ProjectCard({ project, onChanged }) {
+  const navigate = useNavigate();
   const [loadingAction, setLoadingAction] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState(null);
@@ -28,7 +32,8 @@ function ProjectCard({ project, onChanged }) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (event) => {
+    event.stopPropagation();
     setLoadingAction(true);
     setError(null);
 
@@ -49,6 +54,9 @@ function ProjectCard({ project, onChanged }) {
       exit={{ opacity: 0, scale: 0.97 }}
       whileHover={{ y: -3 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
+      onClick={() => {
+        navigate(`project/${project._id}`);
+      }}
       className="group relative rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:border-white/[0.07] dark:bg-white/[0.03] dark:shadow-none dark:hover:border-white/[0.14] dark:hover:bg-white/[0.045]"
     >
       <div className="mb-8 min-w-0 pr-5">
@@ -75,7 +83,10 @@ function ProjectCard({ project, onChanged }) {
           <div className="ml-2 flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setConfirmDelete(false)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmDelete(false);
+              }}
               disabled={loadingAction}
               className="rounded-md px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-zinc-300"
             >
@@ -94,7 +105,10 @@ function ProjectCard({ project, onChanged }) {
           <motion.button
             type="button"
             whileTap={{ scale: 0.92 }}
-            onClick={() => setConfirmDelete(true)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setConfirmDelete(true);
+            }}
             disabled={loadingAction}
             aria-label="Delete project"
             className="ml-1 rounded-md p-1.5 text-zinc-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 dark:text-zinc-600 dark:hover:text-red-400"
