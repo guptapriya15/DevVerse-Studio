@@ -1,67 +1,65 @@
-import { FileCode2, Folder, RefreshCw } from "lucide-react";
+import { FolderTree, RefreshCcw } from "lucide-react";
 import { motion } from "motion/react";
+import Folder from "./Folder";
 
-function TreeNode({ node, depth = 0 }) {
-  const isFolder = node.type === "folder";
-  const Icon = isFolder ? Folder : FileCode2;
-  const children = Array.isArray(node.children) ? node.children : [];
-
+    
+    
+function Explorer({projectId, tree, reloadTree}) {
   return (
-    <div>
-      <div
-        className="flex items-center gap-2 py-1 text-xs text-zinc-300"
-        style={{ paddingLeft: `${12 + depth * 14}px` }}
-      >
-        <Icon size={14} className="shrink-0 text-zinc-500" />
-        <span className="truncate">{node.name}</span>
-      </div>
-      {children.map((child) => (
-        <TreeNode key={child._id} node={child} depth={depth + 1} />
-      ))}
-    </div>
-  );
-}
-
-function Explorer({ projectId, tree = [], error, reloadTree }) {
-  const nodes = Array.isArray(tree) ? tree : [];
-
-  return (
-    <motion.aside
+    <motion.div
       initial={{ opacity: 0, x: -16, width: 0 }}
       animate={{ opacity: 1, x: 0, width: 288 }}
       exit={{ opacity: 0, x: -16, width: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
       className="flex flex-col overflow-hidden border-r border-white/[0.06] bg-[#111113]/90 backdrop-blur-xl"
     >
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
-            Explorer
-          </p>
-          <p className="truncate text-[10px] text-zinc-600">{projectId}</p>
-        </div>
-        <button
-          type="button"
+      <div className="flex h-10 w-72 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
+        <span className="text-[11px] font-semibold tracking-wider text-zinc-500">
+          EXPLORER
+        </span>
+        <motion.button
+          whileHover={{ rotate: 60 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ duration: 0.2 }}
           onClick={reloadTree}
-          aria-label="Refresh files"
-          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
+          className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-white/[0.07] hover:text-white"
+          title="Refresh"
         >
-          <RefreshCw size={14} />
-        </button>
+          <RefreshCcw size={14} />
+        </motion.button>
       </div>
-      {error && (
-        <p className="border-b border-red-400/10 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
-          {error}
-        </p>
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto py-2">
-        {nodes.length > 0 ? (
-          nodes.map((node) => <TreeNode key={node._id} node={node} />)
+      <div
+        className="w-72 flex-1 overflow-y-auto px-1 py-2
+      [&::-webkit-scrollbar]:w-1.5
+      [&::-webkit-scrollbar-track]:bg-transparent
+      [&::-webkit-scrollbar-thumb]:rounded-full
+      [&::-webkit-scrollbar-thumb]:bg-white/[0.08]
+      hover:[&::-webkit-scrollbar-thumb]:bg-white/[0.15]
+      [&::-webkit-scrollbar-thumb]:transition-colors
+      "
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255, 255, 255, 0.1) transparent",
+        }}
+      >
+        {tree.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
+            <FolderTree size={22} className="text-zinc-700" />
+            <span className="text-[12px] text-zinc-600">Empty Workspace</span>
+          </div>
         ) : (
-          <p className="px-3 py-4 text-xs text-zinc-500">No files yet.</p>
+          tree.map((node) => (
+            <Folder
+              key={node._id}
+              projectId={projectId}
+              node={node}
+              tree={tree}
+              reloadTree={reloadTree}
+            />
+          ))
         )}
       </div>
-    </motion.aside>
+    </motion.div>
   );
 }
 

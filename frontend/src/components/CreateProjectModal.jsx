@@ -2,9 +2,12 @@ import { X } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { createProject } from "../features/project";
+import { createRootFolder } from "../features/file";
 
 const getErrorMessage = (error) =>
-  error.response?.data?.message || error.message || "Unable to create the project.";
+  error.response?.data?.message ||
+  error.message ||
+  "Unable to create the project.";
 
 function CreateProjectModal({ open, onClose, onCreated }) {
   const [name, setName] = useState("");
@@ -25,6 +28,10 @@ function CreateProjectModal({ open, onClose, onCreated }) {
 
     try {
       const project = await createProject(trimmedName, description.trim());
+      await createRootFolder({
+        projectId: project._id,
+        projectName: project.name,
+      });
       if (!project || typeof project !== "object") {
         throw new Error("The project service returned an invalid project.");
       }
@@ -84,7 +91,10 @@ function CreateProjectModal({ open, onClose, onCreated }) {
         </div>
         <div className="space-y-6 px-7 py-6">
           <div>
-            <label htmlFor="project-name" className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <label
+              htmlFor="project-name"
+              className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+            >
               Project Name
             </label>
             <input
@@ -98,7 +108,10 @@ function CreateProjectModal({ open, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label htmlFor="project-description" className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <label
+              htmlFor="project-description"
+              className="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+            >
               Description
             </label>
             <textarea

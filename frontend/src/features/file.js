@@ -1,6 +1,6 @@
 import { api } from "../utils/axios";
 
-export const createRootFolder = async (projectId, projectName) => {
+export const createRootFolder = async ({ projectId, projectName }) => {
   const { data } = await api.post("/api/file/create-root-folder", {
     projectId,
     projectName,
@@ -8,7 +8,7 @@ export const createRootFolder = async (projectId, projectName) => {
   return data;
 };
 
-export const createFolder = async (projectId, name, parentId) => {
+export const createFolder = async ({ projectId, name, parentId }) => {
   const { data } = await api.post("/api/file/create-folder", {
     projectId,
     name,
@@ -17,13 +17,13 @@ export const createFolder = async (projectId, name, parentId) => {
   return data;
 };
 
-export const createFile = async (
+export const createFile = async ({
   projectId,
   name,
   parentId,
   content = "",
   language = "plaintext",
-) => {
+}) => {
   const { data } = await api.post("/api/file/create-file", {
     projectId,
     name,
@@ -34,7 +34,7 @@ export const createFile = async (
   return data;
 };
 
-export const updateFile = async ({ name, content, id }) => {
+export const updateFile = async ({ name, content="", id }) => {
   const { data } = await api.post(`/api/file/update/${id}`, {
     name,
     content,
