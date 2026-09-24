@@ -10,10 +10,15 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { getFileIcon, getFolderColor } from "../utils/customizeIcon";
-import { createFile, createFolder, deleteFile, updateFile } from "../features/file";
+import {
+  createFile,
+  createFolder,
+  deleteFile,
+  updateFile,
+} from "../features/file";
 import { createPortal } from "react-dom";
 
-function Folder({ projectId, tree, reloadTree, node }) {
+function Folder({ projectId, tree, reloadTree, node, openFile }) {
   const [folderName, setFolderName] = useState("");
   const [fileName, setFileName] = useState("");
   const [open, setOpen] = useState(false);
@@ -30,7 +35,8 @@ function Folder({ projectId, tree, reloadTree, node }) {
   };
 
   const handleCreateFile = async () => {
-    await createFile({ projectId, name: fileName, parentId: node?._id });
+    const lang=fileName.split(".").pop()
+    await createFile({ projectId, name: fileName, parentId: node?._id, language:lang });
     await reloadTree();
   };
 
@@ -43,7 +49,7 @@ function Folder({ projectId, tree, reloadTree, node }) {
     await reloadTree();
   };
 
-    const handleDeleteFile = async () => {
+  const handleDeleteFile = async () => {
     await deleteFile(node?._id);
     await reloadTree();
   };
@@ -66,6 +72,7 @@ function Folder({ projectId, tree, reloadTree, node }) {
           whileHover={{ x: 2 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
           className="group flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors"
+          onClick={() => openFile(node)}
           onContextMenu={(e) => {
             e.preventDefault();
             setMenu({ x: e.clientX, y: e.clientY });
@@ -100,8 +107,9 @@ function Folder({ projectId, tree, reloadTree, node }) {
               >
                 <button
                   className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-md px-3 py-2 text-[13px] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-                  onClick={() => {setMenu(null)
-                    setRenaming(true)
+                  onClick={() => {
+                    setMenu(null);
+                    setRenaming(true);
                   }}
                 >
                   <Pencil size={13} />
@@ -110,9 +118,8 @@ function Folder({ projectId, tree, reloadTree, node }) {
                 <button
                   className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-md px-3 py-2 text-[13px] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
                   onClick={() => {
-                    handleDeleteFile()
-                    setMenu(null)
-
+                    handleDeleteFile();
+                    setMenu(null);
                   }}
                 >
                   <Trash size={13} />
@@ -123,30 +130,30 @@ function Folder({ projectId, tree, reloadTree, node }) {
             document.body,
           )}
 
-          {renaming && (
-        <div className="py-1 pl-1">
-          <motion.input
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            autoFocus
-            value={renameValue}
-            placeholder={node?.name}
-            className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[13px] text-white placeholder-zinc-500 outline-none transition-all focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15"
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleRenameFile();
-                setRenameValue("");
-                setRenaming(false);
-              }
-              if (e.key === "Escape") {
-                setRenameValue("");
-                setRenaming(false);
-              }
-            }}
-          />
-        </div>
-      )}
+        {renaming && (
+          <div className="py-1 pl-1">
+            <motion.input
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              autoFocus
+              value={renameValue}
+              placeholder={node?.name}
+              className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[13px] text-white placeholder-zinc-500 outline-none transition-all focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15"
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleRenameFile();
+                  setRenameValue("");
+                  setRenaming(false);
+                }
+                if (e.key === "Escape") {
+                  setRenameValue("");
+                  setRenaming(false);
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -268,9 +275,8 @@ function Folder({ projectId, tree, reloadTree, node }) {
                 <button
                   className="mx-1 flex w-[calc(100%-8px)] items-center gap-2 rounded-md px-3 py-2 text-[13px] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
                   onClick={() => {
-                    handleDeleteFile()
-                    setMenu(null)
-
+                    handleDeleteFile();
+                    setMenu(null);
                   }}
                 >
                   <Trash size={13} />
@@ -294,6 +300,7 @@ function Folder({ projectId, tree, reloadTree, node }) {
             <Folder
               projectId={projectId}
               tree={tree}
+              openFile={openFile}
               reloadTree={reloadTree}
               node={child}
             />
