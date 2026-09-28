@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { getFileIcon } from "../utils/customizeIcon";
-import { Check, Loader2, Save, X } from "lucide-react";
+import { Check, Circle, Loader2, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { updateFile } from "../features/file";
 import MonacoEditor from "@monaco-editor/react";
@@ -9,21 +9,45 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
   useEffect(() => {
     setCode(activeTab?.content);
   }, [activeTab]);
+
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [code, setCode] = useState("");
-  const handleCloseTab = (id) => {
+
+  const handleCloseTab = (e, id) => {
+    e.stopPropagation();
     const result = openTabs.filter((tab) => tab._id != id);
     setOpenTabs(result);
+    if (activeTab._id == id) {
+      setActiveTab(result.length ? result[result.length - 1] : null);
+    }
   };
+
+  if (!activeTab)
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0c] text-zinc-600">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+          <Circle size={22} className="text-zinc-700" />
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-sm font-medium text-zinc-400">
+            No File Open
+          </span>
+          <span className="text-xs text-zinc-600">
+            Select a file from Explorer to start editing
+          </span>
+        </div>
+      </div>
+    );
+
   const save = async () => {
-    if (!activeTab) return;
+    if (!activeTab || saving) return;
     try {
       setSaving(true);
       await updateFile({
-        name: activeTab?.name,
+        name: activeTab.name,
         content: code,
-        id: activeTab?._id,
+        id: activeTab._id,
       });
       setActiveTab({ ...activeTab, content: code });
       setOpenTabs((tabs) =>
@@ -31,15 +55,12 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
           tab._id == activeTab._id ? { ...tab, content: code } : tab,
         ),
       );
-      setSaving(false);
       setJustSaved(true);
-
-      setTimeout(() => {
-        setJustSaved(false);
-      }, 1500);
+      setTimeout(() => setJustSaved(false), 1500);
     } catch (error) {
-      setSaving(false);
       console.log(error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -55,6 +76,7 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
             const { icon: Icon, color } = getFileIcon(tab?.name);
             return (
               <motion.div
+                key={tab._id}
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
@@ -66,7 +88,7 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
                 <span className="text-[13px]">{tab?.name}</span>
                 <button
                   className="rounded p-0.5 text-zinc-500 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100"
-                  onClick={() => handleCloseTab(tab?._id)}
+                  onClick={(e) => handleCloseTab(e, tab?._id)}
                 >
                   <X size={13} />
                 </button>
@@ -88,7 +110,8 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
           <span className="text-[13px]">{activeTab?.name}</span>
         </div>
 
-        <motion.div
+        <motion.button
+          type="button"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={save}
@@ -131,7 +154,7 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
               </motion.span>
             )}
           </AnimatePresence>
-        </motion.div>
+        </motion.button>
       </div>
       <div className="min-h-0 flex-1">
         <MonacoEditor
