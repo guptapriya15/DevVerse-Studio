@@ -4,6 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 
 function ActivityIcon({ icon: Icon, label, active, onClick }) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const showTooltip = hovered || focused;
+
   return (
     <div
       className="relative"
@@ -11,10 +14,15 @@ function ActivityIcon({ icon: Icon, label, active, onClick }) {
       onMouseLeave={() => setHovered(false)}
     >
       <motion.button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.94 }}
         onClick={onClick}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className="group relative flex h-9 w-9 items-center justify-center rounded-lg"
       >
         <AnimatePresence>
           {active && (
@@ -29,7 +37,7 @@ function ActivityIcon({ icon: Icon, label, active, onClick }) {
         </AnimatePresence>
         <Icon
           size={19}
-          className={`relative z-10 transition-colors ${active ? "text-sky-400" : "text-zinc-500 hover:text-zinc-300"}`}
+          className={`relative z-10 transition-colors ${active ? "text-sky-400" : "text-zinc-500 group-hover:text-zinc-300"}`}
         />
 
         <AnimatePresence>
@@ -42,7 +50,7 @@ function ActivityIcon({ icon: Icon, label, active, onClick }) {
         </AnimatePresence>
 
         <AnimatePresence>
-          {hovered && (
+          {showTooltip && (
             <motion.div
               initial={{ opacity: 0, x: -4 }}
               animate={{ opacity: 1, x: 0 }}

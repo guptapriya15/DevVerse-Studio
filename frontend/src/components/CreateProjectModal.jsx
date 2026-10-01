@@ -1,21 +1,62 @@
 import { X } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createProject } from "../features/project";
 import { createRootFolder } from "../features/file";
+import { getErrorMessage } from "../utils/errors";
 
-const getErrorMessage = (error) =>
-  error.response?.data?.message ||
-  error.message ||
-  "Unable to create the project.";
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 function CreateProjectModal({ open, onClose, onCreated }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const dialogRef = useRef(null);
+
+  const handleClose = () => {
+    if (loading) return;
+    setError(null);
+    // Don't keep half-typed values around after Cancel / Escape.
+    setName("");
+    setDescription("");
+    onClose();
+  };
+
+  // Escape closes the dialog.
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") handleClose();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loading, onClose]);
 
   if (!open) return null;
+
+  // Keep Tab / Shift+Tab inside the dialog.
+  const handleTrapFocus = (event) => {
+    if (event.key !== "Tab" || !dialogRef.current) return;
+
+    const items = dialogRef.current.querySelectorAll(FOCUSABLE);
+    if (items.length === 0) return;
+
+    const first = items[0];
+    const last = items[items.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleCreateProject = async (event) => {
     event.preventDefault();
@@ -39,16 +80,10 @@ function CreateProjectModal({ open, onClose, onCreated }) {
       setDescription("");
       onCreated?.(project);
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      setError(getErrorMessage(requestError, "Unable to create the project."));
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClose = () => {
-    if (loading) return;
-    setError(null);
-    onClose();
   };
 
   return (
@@ -64,7 +99,12 @@ function CreateProjectModal({ open, onClose, onCreated }) {
       />
       <div className="pointer-events-none absolute -z-10 h-[460px] w-[460px] rounded-full bg-sky-300/20 blur-[130px] dark:bg-sky-500/10" />
       <motion.form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-project-title"
         onSubmit={handleCreateProject}
+        onKeyDown={handleTrapFocus}
         initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
@@ -73,7 +113,10 @@ function CreateProjectModal({ open, onClose, onCreated }) {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent dark:via-white/30" />
         <div className="flex items-center justify-between border-b border-black/[0.06] px-7 py-6 dark:border-white/[0.08]">
           <div>
-            <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 dark:text-white">
+            <h2
+              id="create-project-title"
+              className="text-[17px] font-semibold tracking-tight text-zinc-900 dark:text-white"
+            >
               Create Project
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -104,7 +147,7 @@ function CreateProjectModal({ open, onClose, onCreated }) {
               placeholder="My Awesome Project"
               autoFocus
               disabled={loading}
-              className="w-full rounded-xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition-all focus:border-sky-400/60 focus:bg-white focus:ring-4 focus:ring-sky-400/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/[0.06] dark:focus:ring-sky-400"
+              className="w-full rounded-xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition-all focus:border-sky-400/60 focus:bg-white focus:ring-4 focus:ring-sky-400/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/[0.06] dark:focus:ring-sky-400/15"
             />
           </div>
           <div>
@@ -121,7 +164,7 @@ function CreateProjectModal({ open, onClose, onCreated }) {
               rows={3}
               placeholder="What is this Project about?"
               disabled={loading}
-              className="w-full rounded-xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition-all focus:border-sky-400/60 focus:bg-white focus:ring-4 focus:ring-sky-400/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/[0.06] dark:focus:ring-sky-400"
+              className="w-full rounded-xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition-all focus:border-sky-400/60 focus:bg-white focus:ring-4 focus:ring-sky-400/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-zinc-500 dark:focus:bg-white/[0.06] dark:focus:ring-sky-400/15"
             />
           </div>
           {error && (

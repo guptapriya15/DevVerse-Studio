@@ -1,25 +1,56 @@
 import { AnimatePresence, motion } from "motion/react";
 import { getFileIcon } from "../utils/customizeIcon";
 import { Check, Circle, Loader2, Save, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { updateFile } from "../features/file";
 import MonacoEditor from "@monaco-editor/react";
 
-function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
-  useEffect(() => {
-    setCode(activeTab?.content);
-  }, [activeTab]);
-
+function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const [code, setCode] = useState("");
+  // Unsaved edits, keyed by file id. A file has a draft only while it differs
+  // from what was last saved, so switching tabs never loses or resets work.
+  const [drafts, setDrafts] = useState({});
+
+  const isDirty = (tab) =>
+    drafts[tab._id] !== undefined &&
+    drafts[tab._id] !== (tab.content ?? "");
+
+  // `code` is derived, never copied into state. That is what stops the editor
+  // content from being "refreshed" whenever activeTab changes (e.g. after save).
+  const code = activeTab
+    ? (drafts[activeTab._id] ?? activeTab.content ?? "")
+    : "";
+
+  const handleChange = (value) => {
+    if (!activeTab) return;
+    const id = activeTab._id;
+    setDrafts((prev) => ({ ...prev, [id]: value ?? "" }));
+  };
 
   const handleCloseTab = (e, id) => {
     e.stopPropagation();
-    const result = openTabs.filter((tab) => tab._id != id);
+
+    const tab = openTabs.find((t) => t._id == id);
+    if (
+      tab &&
+      isDirty(tab) &&
+      !window.confirm("This file has unsaved changes. Close it anyway?")
+    ) {
+      return;
+    }
+
+    const closedIndex = openTabs.findIndex((t) => t._id == id);
+    const result = openTabs.filter((t) => t._id != id);
     setOpenTabs(result);
-    if (activeTab._id == id) {
-      setActiveTab(result.length ? result[result.length - 1] : null);
+    setDrafts((prev) => {
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
+
+    if (activeTab?._id == id) {
+      const neighbour = result[Math.min(closedIndex, result.length - 1)];
+      setActiveTab(neighbour ?? null);
     }
   };
 
@@ -42,19 +73,30 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
 
   const save = async () => {
     if (!activeTab || saving) return;
+
+    const id = activeTab._id;
+    const content = code; // snapshot of exactly what is being saved
+
     try {
       setSaving(true);
-      await updateFile({
-        name: activeTab.name,
-        content: code,
-        id: activeTab._id,
-      });
-      setActiveTab({ ...activeTab, content: code });
+      await updateFile({ name: activeTab.name, content, id });
+
       setOpenTabs((tabs) =>
-        tabs.map((tab) =>
-          tab._id == activeTab._id ? { ...tab, content: code } : tab,
-        ),
+        tabs.map((tab) => (tab._id == id ? { ...tab, content } : tab)),
       );
+      // Functional update: don't clobber a tab the user switched to meanwhile.
+      setActiveTab((current) =>
+        current && current._id == id ? { ...current, content } : current,
+      );
+      // Only drop the draft if nothing new was typed while the request ran.
+      setDrafts((prev) => {
+        if (prev[id] !== content) return prev;
+        const { [id]: _saved, ...rest } = prev;
+        return rest;
+      });
+      // Keep the project tree (used by Preview and Explorer) in sync.
+      onSaved?.({ ...activeTab, content });
+
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 1500);
     } catch (error) {
@@ -86,6 +128,12 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
               >
                 <Icon size={14} className={`${color}`} />
                 <span className="text-[13px]">{tab?.name}</span>
+                {isDirty(tab) && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-sky-400"
+                    title="Unsaved changes"
+                  />
+                )}
                 <button
                   className="rounded p-0.5 text-zinc-500 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100"
                   onClick={(e) => handleCloseTab(e, tab?._id)}
@@ -95,6 +143,7 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
 
                 {active && (
                   <motion.div
+                    layoutId="activeTabUnderline"
                     className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-sky-400 to-violet-400"
                     transition={{ duration: 0.2, ease: "easeOut" }}
                   ></motion.div>
@@ -160,9 +209,11 @@ function Editor({ activeTab, openTabs, setOpenTabs, setActiveTab }) {
         <MonacoEditor
           height="100%"
           theme="vs-dark"
+          // One Monaco model per file: keeps undo history and cursor per tab.
+          path={String(activeTab._id)}
           language={activeTab?.language || "plaintext"}
           value={code}
-          onChange={(value) => setCode(value || "")}
+          onChange={handleChange}
           options={{
             fontSize: 14,
             automaticLayout: true,

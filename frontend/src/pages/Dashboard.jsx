@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { signInWithPopup } from "firebase/auth";
-import { Folder, Loader2, Plus } from "lucide-react";
+import { Folder, Loader2, Menu, Plus } from "lucide-react";
+import { AnimatePresence } from "motion/react";
 import { useDispatch, useSelector } from "react-redux";
 import { FcGoogle } from "react-icons/fc";
 import { auth, googleProvider } from "../../firebase";
@@ -11,9 +12,13 @@ import ProjectCard from "../components/ProjectCard";
 import SideBar from "../components/SideBar";
 import { clearProjects, fetchProjects } from "../redux/projectSlice";
 import { setUserData } from "../redux/userSlice";
+import { getErrorMessage } from "../utils/errors";
 
-const getErrorMessage = (error, fallback) =>
-  error.response?.data?.message || error.message || fallback;
+// Errors caused by the user closing the Google popup on purpose.
+const IGNORED_AUTH_ERRORS = [
+  "auth/popup-closed-by-user",
+  "auth/cancelled-popup-request",
+];
 
 const LoadingScreen = () => (
   <div className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 transition-colors duration-300 dark:bg-[#07070c]">
@@ -26,6 +31,7 @@ export default function Dashboard() {
   const [loginError, setLoginError] = useState(null);
   const [activeSession, setActiveSession] = useState("projects");
   const [openModal, setOpenModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const dispatch = useDispatch();
   const { userData, authLoading, authError } = useSelector((state) => state.user);
   const { projects = [], loading: loadingProjects, error: projectError } = useSelector(
@@ -47,6 +53,8 @@ export default function Dashboard() {
 
       dispatch(setUserData(data));
     } catch (error) {
+      if (IGNORED_AUTH_ERRORS.includes(error?.code)) return;
+
       setLoginError(
         getErrorMessage(error, "Unable to sign in. Please try again."),
       );
@@ -73,6 +81,12 @@ export default function Dashboard() {
 
   const refreshProjects = () => {
     dispatch(fetchProjects(activeSession));
+  };
+
+  // Selecting a section also closes the mobile drawer.
+  const handleSelectSession = (session) => {
+    setActiveSession(session);
+    setSidebarOpen(false);
   };
 
   if (authLoading) {
@@ -107,8 +121,23 @@ export default function Dashboard() {
             <FcGoogle />
             {loading ? "Signing in..." : "Continue with Google"}
           </button>
+          {/* NOTE: make sure /terms and /privacy routes exist, or change these hrefs. */}
           <p className="mt-5 text-[11px] text-slate-400 dark:text-slate-600">
-            By continuing you agree to our Terms & Privacy Policy.
+            By continuing you agree to our{" "}
+            <a
+              href="/terms"
+              className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-400"
+            >
+              Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href="/privacy"
+              className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-400"
+            >
+              Privacy Policy
+            </a>
+            .
           </p>
         </div>
       </div>
@@ -121,21 +150,41 @@ export default function Dashboard() {
       <div className="pointer-events-none absolute right-0 top-1/3 hidden h-[500px] w-[500px] rounded-full bg-white/[0.03] blur-[130px] dark:block" />
       <div className="relative flex min-h-0 flex-1 flex-col">
         <NavBar />
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 top-16 z-30 bg-black/30 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+              aria-hidden="true"
+            />
+          )}
           <SideBar
             activeSession={activeSession}
-            setActiveSession={setActiveSession}
+            setActiveSession={handleSelectSession}
+            open={sidebarOpen}
           />
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8 [scrollbar-width:thin] [scrollbar-color:rgba(100,116,139,0.35)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-clip-padding hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 dark:[&::-webkit-scrollbar-thumb]:bg-white/10 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <h1 className="flex items-center gap-2 text-[26px] font-bold text-slate-900 dark:text-white">
-                  Welcome Back, {userData?.name?.split(" ")[0] || "User"}
-                  <span>👋🏻</span>
-                </h1>
-                <p className="mt-1 text-[13.5px] text-slate-500 dark:text-slate-400">
-                  Ready to build something amazing today?
-                </p>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8 [scrollbar-width:thin] [scrollbar-color:rgba(100,116,139,0.35)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-clip-padding hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 dark:[&::-webkit-scrollbar-thumb]:bg-white/10 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+            <div className="mb-8 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Open navigation"
+                  className="mt-0.5 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                >
+                  <Menu size={20} />
+                </button>
+                <div className="min-w-0">
+                  <h1 className="flex items-center gap-2 text-[22px] font-bold text-slate-900 md:text-[26px] dark:text-white">
+                    <span className="truncate">
+                      Welcome Back, {userData?.name?.split(" ")[0] || "User"}
+                    </span>
+                    <span>👋🏻</span>
+                  </h1>
+                  <p className="mt-1 text-[13.5px] text-slate-500 dark:text-slate-400">
+                    Ready to build something amazing today?
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -195,13 +244,15 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project._id}
-                    project={project}
-                    onChanged={refreshProjects}
-                  />
-                ))}
+                <AnimatePresence>
+                  {projects.map((project) => (
+                    <ProjectCard
+                      key={project._id}
+                      project={project}
+                      onChanged={refreshProjects}
+                    />
+                  ))}
+                </AnimatePresence>
               </div>
             )}
           </div>

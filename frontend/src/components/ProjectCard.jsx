@@ -3,11 +3,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteProject, toggleStar } from "../features/project";
-
-const getErrorMessage = (error) =>
-  error.response?.data?.message ||
-  error.message ||
-  "Unable to update the project.";
+import { getErrorMessage } from "../utils/errors";
 
 function ProjectCard({ project, onChanged }) {
   const navigate = useNavigate();
@@ -26,7 +22,7 @@ function ProjectCard({ project, onChanged }) {
       await toggleStar(project._id);
       onChanged?.();
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      setError(getErrorMessage(requestError, "Unable to update the project."));
     } finally {
       setLoadingAction(false);
     }
@@ -41,7 +37,7 @@ function ProjectCard({ project, onChanged }) {
       await deleteProject(project._id);
       onChanged?.();
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      setError(getErrorMessage(requestError, "Unable to delete the project."));
     } finally {
       setLoadingAction(false);
     }
@@ -75,6 +71,7 @@ function ProjectCard({ project, onChanged }) {
           disabled={loadingAction}
           onClick={handleToggleStar}
           aria-label={project.starred ? "Unstar project" : "Star project"}
+          aria-pressed={!!project.starred}
           className={`rounded-md p-1.5 transition-colors hover:bg-amber-50 dark:hover:bg-amber-400/10 ${project.starred ? "text-amber-400" : "text-zinc-300 group-hover:text-zinc-500 dark:text-zinc-600 dark:group-hover:text-zinc-400"} ${loadingAction ? "cursor-wait opacity-60" : ""}`}
         >
           <Star size={15} className={project.starred ? "fill-amber-400" : ""} />
