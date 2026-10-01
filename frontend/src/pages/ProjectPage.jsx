@@ -245,7 +245,8 @@ function ProjectPage() {
           className={`${mobilePane === "chat" ? "flex" : "hidden"} w-full md:flex md:w-auto`}
         >
           <AnimatePresence initial={false}>
-            {showAiChat && <AiChat projectId={id} />}
+            {showAiChat && <AiChat projectId={id}
+            reloadTree={reloadTree} />}
           </AnimatePresence>
         </div>
       </div>

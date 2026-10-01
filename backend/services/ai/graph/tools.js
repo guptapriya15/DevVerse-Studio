@@ -266,6 +266,7 @@ export const fileTools = ({ projectId, userId }) => {
         operation: "file_deleted",
         file: {
           _id: file._id,
+          name:file.name,
         },
       });
     },

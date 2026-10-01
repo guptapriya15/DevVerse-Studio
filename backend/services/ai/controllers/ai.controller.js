@@ -36,7 +36,7 @@ const sendEvent = (res, type, data) => {
 
 export const chat = async (req, res) => {
   let disconnected = false;
-    const ac = new AbortController();
+  const ac = new AbortController();
   try {
     const { projectId, message, history = [] } = req.body;
     const userId = req.headers["x-user-id"];
@@ -58,7 +58,7 @@ export const chat = async (req, res) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
     res.once("close", () => {
-        ac.abort();
+      ac.abort();
       disconnected = true;
       console.log("AI CLIENT DISCONNECTED");
     });
@@ -120,27 +120,16 @@ export const chat = async (req, res) => {
       if (chunk.tools) {
         const toolMessages = chunk.tools?.messages || [];
         for (const toolMessage of toolMessages) {
-          let result = null;
+          let result = toolMessage.content;
           try {
-            result = JSON.parse(
-              typeof toolMessage.content === "string"
-                ? toolMessage.content
-                : JSON.stringify(toolMessage.content),
-            );
-          } catch {
-            result = null;
-          }
-
-          const args = pendingArgs.get(toolMessage.tool_call_id);
-          if (result?.file && args?.content !== undefined) {
-            result.file.content = args.content;
+            result = typeof result == "string" ? JSON.parse(result) : result;
+          } catch (error) {
+            continue;
           }
 
           if (result?.operation) {
             sendEvent(res, result.operation, result);
-            continue;
           }
-          sendEvent(res, "tool_result", { content: toolMessage.content });
         }
       }
     }
