@@ -48,15 +48,15 @@ const patchNode = (nodes, id, patch) =>
 
 function ProjectPage() {
   const { id } = useParams();
-  const [showExplorer, setShowExplorer] = useState(false);
-  const [showAiChat, setShowAiChat] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(true);
+  const [showAiChat, setShowAiChat] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [tree, setTree] = useState([]);
   const [mobilePane, setMobilePane] = useState("explorer");
   const [openTabs, setOpenTabs] = useState([]);
   const [activeTab, setActiveTab] = useState(null);
-  const [showBottomPanel, setShowBottomPanel] = useState(false);
+  const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [pageError, setPageError] = useState(null);
   const dispatch = useDispatch();
 

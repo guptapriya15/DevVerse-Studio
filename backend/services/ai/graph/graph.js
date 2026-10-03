@@ -194,6 +194,8 @@ index.html
 package.json
 - project root 
 
+package.json contains: @vitejs/plugin-react
+
 vite.config.js
 - project root 
 
