@@ -17,15 +17,44 @@ import {
   deleteFile,
   updateFile,
 } from "../features/file";
+import { getErrorMessage } from "../utils/errors";
+
+const nodeIds = (node) => [
+  String(node._id),
+  ...(node.children ?? []).flatMap((child) => nodeIds(child)),
+];
 
 /* ------------------------------------------------------------------ */
 /* Shared building blocks                                              */
 /* ------------------------------------------------------------------ */
 
 // Small text input used for "new file", "new folder" and "rename".
-// Enter submits, Escape or clicking away cancels.
-function InlineInput({ placeholder, onSubmit, onClose }) {
-  const [value, setValue] = useState("");
+// Enter submits, Escape or clicking away cancels. Failed async mutations keep
+// the input open so the user can correct or retry the request.
+function InlineInput({ placeholder, initialValue = "", onSubmit, onClose }) {
+  const [value, setValue] = useState(initialValue);
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event) => {
+    event?.preventDefault();
+    const nextValue = value.trim();
+    if (!nextValue) {
+      setError("Name cannot be empty.");
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      await onSubmit(nextValue);
+      onClose();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to update this item."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="py-1 pl-1">
@@ -35,19 +64,29 @@ function InlineInput({ placeholder, onSubmit, onClose }) {
         autoFocus
         value={value}
         placeholder={placeholder}
-        className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[13px] text-white placeholder-zinc-500 outline-none transition-all focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15"
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            onSubmit(value);
-            onClose();
+        disabled={submitting}
+        className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[13px] text-white placeholder-zinc-500 outline-none transition-all focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15 disabled:opacity-60"
+        onChange={(event) => {
+          setValue(event.target.value);
+          if (error) setError(null);
+        }}
+        onBlur={() => {
+          if (!submitting) onClose();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            void submit(event);
           }
-          if (e.key === "Escape") {
+          if (event.key === "Escape" && !submitting) {
             onClose();
           }
         }}
       />
+      {error && (
+        <p role="alert" className="mt-1 text-[11px] text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -132,14 +171,64 @@ function ContextMenu({ menu, onClose, children }) {
   );
 }
 
+function DeleteConfirm({
+  label,
+  warning,
+  loading,
+  error,
+  onCancel,
+  onConfirm,
+}) {
+  return (
+    <div className="mt-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-2">
+      <p className="text-[11px] leading-relaxed text-red-200">
+        Delete {label}? {warning}
+      </p>
+      <div className="mt-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="rounded-md px-2 py-1 text-[11px] text-zinc-400 hover:text-white disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={loading}
+          className="rounded-md bg-red-500/20 px-2 py-1 text-[11px] font-medium text-red-200 hover:bg-red-500/30 disabled:cursor-wait disabled:opacity-50"
+        >
+          {loading ? "Deleting..." : "Delete"}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-[11px] text-red-300">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* File row                                                            */
 /* ------------------------------------------------------------------ */
 
-function FileNode({ node, reloadTree, openFile }) {
+function FileNode({
+  node,
+  reloadTree,
+  openFile,
+  dirtyFileIds,
+  onDeleted,
+}) {
   const [menu, setMenu] = useState(null);
   const [renaming, setRenaming] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const { icon: Icon, color } = getFileIcon(node.name);
+  const isDirty = dirtyFileIds.includes(String(node._id));
 
   const closeMenu = () => setMenu(null);
 
@@ -147,14 +236,24 @@ function FileNode({ node, reloadTree, openFile }) {
     await updateFile({
       name: newName,
       id: node?._id,
-      content: node?.content,
+      expectedUpdatedAt: node?.updatedAt,
     });
     await reloadTree();
   };
 
   const handleDeleteFile = async () => {
-    await deleteFile(node?._id);
-    await reloadTree();
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await deleteFile(node?._id);
+      onDeleted?.([String(node._id)]);
+      setConfirmDelete(false);
+      await reloadTree();
+    } catch (requestError) {
+      setActionError(getErrorMessage(requestError, "Unable to delete this file."));
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -162,11 +261,11 @@ function FileNode({ node, reloadTree, openFile }) {
       <motion.div
         whileHover={{ x: 2 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors"
+        className="group flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.05]"
         onClick={() => openFile(node)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setMenu({ x: e.clientX, y: e.clientY });
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenu({ x: event.clientX, y: event.clientY });
         }}
       >
         <div className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5">
@@ -183,6 +282,7 @@ function FileNode({ node, reloadTree, openFile }) {
           icon={Pencil}
           onClick={() => {
             closeMenu();
+            setActionError(null);
             setRenaming(true);
           }}
         >
@@ -191,8 +291,9 @@ function FileNode({ node, reloadTree, openFile }) {
         <MenuItem
           icon={Trash}
           onClick={() => {
-            handleDeleteFile();
             closeMenu();
+            setActionError(null);
+            setConfirmDelete(true);
           }}
         >
           Delete
@@ -201,9 +302,25 @@ function FileNode({ node, reloadTree, openFile }) {
 
       {renaming && (
         <InlineInput
+          initialValue={node?.name}
           placeholder={node?.name}
           onSubmit={handleRenameFile}
           onClose={() => setRenaming(false)}
+        />
+      )}
+
+      {confirmDelete && (
+        <DeleteConfirm
+          label={`“${node?.name}”`}
+          warning={
+            isDirty
+              ? "Your unsaved changes will be discarded."
+              : "This cannot be undone."
+          }
+          loading={actionLoading}
+          error={actionError}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => void handleDeleteFile()}
         />
       )}
     </div>
@@ -214,13 +331,25 @@ function FileNode({ node, reloadTree, openFile }) {
 /* Folder row                                                          */
 /* ------------------------------------------------------------------ */
 
-function FolderNode({ projectId, reloadTree, node, openFile }) {
+function FolderNode({
+  projectId,
+  reloadTree,
+  node,
+  openFile,
+  dirtyFileIds,
+  onDeleted,
+}) {
   const [open, setOpen] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [creatingFile, setCreatingFile] = useState(false);
   const [menu, setMenu] = useState(null);
   const [renaming, setRenaming] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const folderColor = getFolderColor(node?.name);
+  const ids = nodeIds(node);
+  const hasDirtyDescendant = ids.some((id) => dirtyFileIds.includes(id));
 
   const closeMenu = () => setMenu(null);
 
@@ -230,7 +359,7 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
   };
 
   const handleCreateFile = async (name) => {
-    const lang = name.split(".").pop();
+    const lang = name.includes(".") ? name.split(".").pop() : "plaintext";
     await createFile({
       projectId,
       name,
@@ -240,18 +369,30 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
     await reloadTree();
   };
 
-  const handleRenameFile = async (newName) => {
+  const handleRenameFolder = async (newName) => {
     await updateFile({
       name: newName,
       id: node?._id,
-      content: node?.content,
+      expectedUpdatedAt: node?.updatedAt,
     });
     await reloadTree();
   };
 
-  const handleDeleteFile = async () => {
-    await deleteFile(node?._id);
-    await reloadTree();
+  const handleDeleteFolder = async () => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await deleteFile(node?._id);
+      onDeleted?.(ids);
+      setConfirmDelete(false);
+      await reloadTree();
+    } catch (requestError) {
+      setActionError(
+        getErrorMessage(requestError, "Unable to delete this folder."),
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Both entry points (hover buttons and context menu) expand the folder so
@@ -273,10 +414,10 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
       <motion.div
         whileHover={{ x: 2 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors"
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setMenu({ x: e.clientX, y: e.clientY });
+        className="group flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.05]"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenu({ x: event.clientX, y: event.clientY });
         }}
       >
         <div
@@ -309,8 +450,8 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.92 }}
             className="rounded-md p-1 text-zinc-500 hover:bg-white/10 hover:text-white"
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               startNewFile();
             }}
           >
@@ -323,8 +464,8 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.92 }}
             className="rounded-md p-1 text-zinc-500 hover:bg-white/10 hover:text-white"
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               startNewFolder();
             }}
           >
@@ -357,6 +498,7 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
           icon={Pencil}
           onClick={() => {
             closeMenu();
+            setActionError(null);
             setRenaming(true);
           }}
         >
@@ -367,8 +509,9 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
           <MenuItem
             icon={Trash}
             onClick={() => {
-              handleDeleteFile();
               closeMenu();
+              setActionError(null);
+              setConfirmDelete(true);
             }}
           >
             Delete
@@ -386,12 +529,15 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
             transition={{ duration: 0.16, ease: "easeOut" }}
             className="ml-5 overflow-hidden border-l border-white/[0.05] pl-1"
           >
-            {node.children.map((child) => (
+            {(node.children ?? []).map((child) => (
               <Folder
+                key={child._id}
                 projectId={projectId}
                 openFile={openFile}
                 reloadTree={reloadTree}
                 node={child}
+                dirtyFileIds={dirtyFileIds}
+                onDeleted={onDeleted}
               />
             ))}
           </motion.div>
@@ -416,9 +562,25 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
 
       {renaming && (
         <InlineInput
+          initialValue={node?.name}
           placeholder={node?.name}
-          onSubmit={handleRenameFile}
+          onSubmit={handleRenameFolder}
           onClose={() => setRenaming(false)}
+        />
+      )}
+
+      {confirmDelete && (
+        <DeleteConfirm
+          label={`folder “${node?.name}”`}
+          warning={
+            hasDirtyDescendant
+              ? "Unsaved changes inside it will be discarded."
+              : "All files and folders inside it will be deleted."
+          }
+          loading={actionLoading}
+          error={actionError}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => void handleDeleteFolder()}
         />
       )}
     </div>
@@ -429,9 +591,24 @@ function FolderNode({ projectId, reloadTree, node, openFile }) {
 /* Public component                                                    */
 /* ------------------------------------------------------------------ */
 
-function Folder({ projectId, reloadTree, node, openFile }) {
-  if (node.type == "file") {
-    return <FileNode node={node} reloadTree={reloadTree} openFile={openFile} />;
+function Folder({
+  projectId,
+  reloadTree,
+  node,
+  openFile,
+  dirtyFileIds = [],
+  onDeleted,
+}) {
+  if (node.type === "file") {
+    return (
+      <FileNode
+        node={node}
+        reloadTree={reloadTree}
+        openFile={openFile}
+        dirtyFileIds={dirtyFileIds}
+        onDeleted={onDeleted}
+      />
+    );
   }
 
   return (
@@ -440,6 +617,8 @@ function Folder({ projectId, reloadTree, node, openFile }) {
       node={node}
       reloadTree={reloadTree}
       openFile={openFile}
+      dirtyFileIds={dirtyFileIds}
+      onDeleted={onDeleted}
     />
   );
 }

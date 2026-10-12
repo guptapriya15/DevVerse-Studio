@@ -20,7 +20,14 @@ function useIsMobile() {
   return isMobile;
 }
 
-function Explorer({ projectId, tree, reloadTree, openFile }) {
+function Explorer({
+  projectId,
+  tree,
+  reloadTree,
+  openFile,
+  dirtyFileIds = [],
+  onDeleted,
+}) {
   const [refreshing, setRefreshing] = useState(false);
   const isMobile = useIsMobile();
 
@@ -87,6 +94,8 @@ function Explorer({ projectId, tree, reloadTree, openFile }) {
               node={node}
               reloadTree={reloadTree}
               openFile={openFile}
+              dirtyFileIds={dirtyFileIds}
+              onDeleted={onDeleted}
             />
           ))
         )}

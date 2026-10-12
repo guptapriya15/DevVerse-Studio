@@ -58,6 +58,8 @@ function ProjectPage() {
   const [activeTab, setActiveTab] = useState(null);
   const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [pageError, setPageError] = useState(null);
+  const [dirtyFileIds, setDirtyFileIds] = useState([]);
+  const [deletedFileIds, setDeletedFileIds] = useState([]);
   const dispatch = useDispatch();
 
   const reloadTree = useCallback(async () => {
@@ -70,6 +72,32 @@ function ProjectPage() {
       setPageError(getErrorMessage(error, "Unable to load project."));
     }
   }, [id]);
+
+  const handleDirtyChange = useCallback((ids) => {
+    setDirtyFileIds((previous) => {
+      const unchanged =
+        previous.length === ids.length &&
+        previous.every((fileId, index) => fileId === ids[index]);
+      return unchanged ? previous : ids;
+    });
+  }, []);
+
+  const handleFilesDeleted = useCallback(
+    (ids) => {
+      const deleted = new Set(ids.map(String));
+      setDeletedFileIds(ids);
+      setOpenTabs((tabs) =>
+        tabs.filter((tab) => !deleted.has(String(tab._id))),
+      );
+      setActiveTab((current) =>
+        current && deleted.has(String(current._id)) ? null : current,
+      );
+      setDirtyFileIds((current) =>
+        current.filter((fileId) => !deleted.has(String(fileId))),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -117,26 +145,36 @@ function ProjectPage() {
     // was deleted", so don't close the user's tabs because of it.
     if (tree.length === 0) return;
 
-    // Returns the same object when nothing changed (so React can skip
-    // re-rendering), a refreshed copy when it did, or null if the file is gone.
+    const dirty = new Set(dirtyFileIds.map(String));
+
+    // Clean tabs follow the refreshed tree. Dirty tabs whose files disappear
+    // remain open and are marked so Editor can preserve their local draft.
     const syncTab = (tab) => {
       const node = findNode(tree, tab._id);
-      if (!node) return null;
+      if (!node) {
+        if (!dirty.has(String(tab._id))) return null;
+        return tab.remoteDeleted ? tab : { ...tab, remoteDeleted: true };
+      }
+
+      const next = {
+        ...tab,
+        ...node,
+        remoteDeleted: false,
+      };
       if (
-        node.name === tab.name &&
-        node.language === tab.language &&
-        node.content === tab.content
+        next.name === tab.name &&
+        next.language === tab.language &&
+        next.content === tab.content &&
+        next.updatedAt === tab.updatedAt &&
+        !tab.remoteDeleted
       ) {
         return tab;
       }
-      return {
-        ...tab,
-        name: node.name,
-        language: node.language,
-        content: node.content,
-      };
+      return next;
     };
 
+    // Reconcile React state with the externally refreshed file tree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenTabs((tabs) => {
       const next = tabs.map(syncTab).filter(Boolean);
       const unchanged =
@@ -144,7 +182,7 @@ function ProjectPage() {
       return unchanged ? tabs : next;
     });
     setActiveTab((current) => (current ? syncTab(current) : current));
-  }, [tree]);
+  }, [dirtyFileIds, tree]);
 
   const openFile = (file) => {
     // The tree copy can be older than the tab copy, so prefer the open tab.
@@ -157,7 +195,7 @@ function ProjectPage() {
   // Called by Editor after a successful save so Preview / Explorer / rename
   // all see the saved content instead of the stale copy loaded at page start.
   const handleFileSaved = useCallback((file) => {
-    setTree((prev) => patchNode(prev, file._id, { content: file.content }));
+    setTree((prev) => patchNode(prev, file._id, { ...file }));
   }, []);
 
   return (
@@ -215,6 +253,8 @@ function ProjectPage() {
                 openFile={openFile}
                 error={pageError}
                 reloadTree={reloadTree}
+                dirtyFileIds={dirtyFileIds}
+                onDeleted={handleFilesDeleted}
               />
             )}
           </AnimatePresence>
@@ -303,6 +343,8 @@ function ProjectPage() {
                 setOpenTabs={setOpenTabs}
                 setActiveTab={setActiveTab}
                 onSaved={handleFileSaved}
+                onDirtyChange={handleDirtyChange}
+                deletedFileIds={deletedFileIds}
               />
             </div>
           </div>

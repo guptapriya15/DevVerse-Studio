@@ -40,18 +40,32 @@ export const createFile = async ({
   }
 };
 
-export const updateFile = async ({ name, content = "", userId, id }) => {
+export const updateFile = async ({
+  name,
+  content,
+  expectedUpdatedAt,
+  userId,
+  id,
+}) => {
   try {
+    const payload = {};
+
+    if (name !== undefined) payload.name = name;
+    if (content !== undefined) payload.content = content;
+    if (expectedUpdatedAt !== undefined) {
+      payload.expectedUpdatedAt = expectedUpdatedAt;
+    }
+
     const { data } = await axios.post(
-      `${File_url}/update-file/${id}`,
-      { name, content },
+      `${File_url}/update/${id}`,
+      payload,
       {
         headers: { "x-user-id": String(userId) },
       },
     );
     return data;
   } catch (error) {
-    throw new Error(error);
+    throw error;
   }
 };
 

@@ -129,7 +129,7 @@ export const createFile = async (req, res) => {
 
 export const updateFile = async (req, res) => {
   try {
-    const { name, content } = req.body;
+    const { name, content, expectedUpdatedAt } = req.body;
     const userId = req.headers["x-user-id"];
     if (!userId) {
       return res.status(401).json({
@@ -137,30 +137,72 @@ export const updateFile = async (req, res) => {
       });
     }
 
-    const file = await File.findOne({
+    const update = {};
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "name cannot be empty" });
+      }
+
+      const nextName = name.trim();
+      update.name = nextName;
+      update.extension = nextName.includes(".")
+        ? nextName.split(".").pop()
+        : "";
+    }
+
+    if (content !== undefined) {
+      if (typeof content !== "string") {
+        return res.status(400).json({ message: "content must be a string" });
+      }
+
+      update.content = content;
+      update.size = content.length;
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ message: "nothing to update" });
+    }
+
+    const filter = {
+      _id: req.params.id,
+      owner: userId,
+      isDeleted: false,
+    };
+
+    if (expectedUpdatedAt !== undefined) {
+      const expectedDate = new Date(expectedUpdatedAt);
+      if (Number.isNaN(expectedDate.getTime())) {
+        return res.status(400).json({ message: "invalid expectedUpdatedAt" });
+      }
+      filter.updatedAt = expectedDate;
+    }
+
+    const file = await File.findOneAndUpdate(
+      filter,
+      { $set: update },
+      { new: true, runValidators: true },
+    );
+
+    if (file) {
+      return res.status(200).json(file);
+    }
+
+    const currentFile = await File.findOne({
       _id: req.params.id,
       owner: userId,
       isDeleted: false,
     });
 
-    if (!file) {
+    if (!currentFile) {
       return res.status(404).json({ message: "file not found" });
     }
-    if (name) {
-      file.name = name;
 
-      const extension = name.includes(".") ? name.split(".").pop() : "";
-
-      file.extension = extension;
-    }
-
-    if (content !== undefined) {
-      ((file.content = content), (file.size = content.length));
-    }
-
-    await file.save();
-
-    res.status(200).json(file);
+    return res.status(409).json({
+      code: "FILE_CONFLICT",
+      message: "file changed on the server; reload it before saving",
+      file: currentFile,
+    });
   } catch (error) {
     res.status(500).json({ message: `update file error ${error}` });
   }
@@ -174,24 +216,43 @@ export const deleteFile = async (req, res) => {
       return res.status(401).json({ message: "userid is required" });
     }
 
-    const file = await File.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        owner: userId,
-        isDeleted: false,
-      },
-      {
-        isDeleted: true,
-      },
-      {
-        new: true,
-      },
-    );
+    const file = await File.findOne({
+      _id: req.params.id,
+      owner: userId,
+      isDeleted: false,
+    });
 
     if (!file) {
       return res.status(404).json({ message: "file not found" });
     }
 
+    const ids = [file._id];
+    let parentIds = [file._id];
+
+    while (parentIds.length > 0) {
+      const children = await File.find({
+        owner: userId,
+        projectId: file.projectId,
+        parentId: { $in: parentIds },
+        isDeleted: false,
+      }).select("_id");
+
+      if (children.length === 0) break;
+
+      ids.push(...children.map((child) => child._id));
+      parentIds = children.map((child) => child._id);
+    }
+
+    await File.updateMany(
+      {
+        _id: { $in: ids },
+        owner: userId,
+        isDeleted: false,
+      },
+      { $set: { isDeleted: true } },
+    );
+
+    file.isDeleted = true;
     return res.status(200).json(file);
   } catch (error) {
     res.status(500).json({ message: `delete file error ${error}` });

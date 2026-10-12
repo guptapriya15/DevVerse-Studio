@@ -34,11 +34,21 @@ export const createFile = async ({
   return data;
 };
 
-export const updateFile = async ({ name, content="", id }) => {
-  const { data } = await api.post(`/api/file/update/${id}`, {
-    name,
-    content,
-  });
+export const updateFile = async ({
+  name,
+  content,
+  expectedUpdatedAt,
+  id,
+}) => {
+  const payload = {};
+
+  if (name !== undefined) payload.name = name;
+  if (content !== undefined) payload.content = content;
+  if (expectedUpdatedAt !== undefined) {
+    payload.expectedUpdatedAt = expectedUpdatedAt;
+  }
+
+  const { data } = await api.post(`/api/file/update/${id}`, payload);
   return data;
 };
 
