@@ -5,6 +5,7 @@ import { me } from "./features/me";
 import Dashboard from "./pages/Dashboard";
 import { setAuthError, setAuthLoading, setUserData } from "./redux/userSlice";
 import ProjectPage from "./pages/ProjectPage";
+import Plan from "./pages/Plan";
 
 function App() {
   const dispatch = useDispatch();
@@ -46,6 +47,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/project/:id" element={<ProjectPage />} />
+        <Route path="/plan" element={<Plan />} />
       </Routes>
     </BrowserRouter>
   );

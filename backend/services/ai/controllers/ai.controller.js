@@ -1,5 +1,6 @@
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { graph } from "../graph/graph.js";
+import { deductCredits } from "../utils/deductCredits.js";
 
 const buildHistory = (history) => {
   if (!Array.isArray(history)) {
@@ -81,6 +82,9 @@ export const chat = async (req, res) => {
         signal: ac.signal,
       },
     );
+
+    await deductCredits({ userId, amount: 10 });
+
     const pendingArgs = new Map();
     let finalMessage = "";
     for await (const chunk of stream) {
