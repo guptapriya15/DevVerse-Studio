@@ -1,7 +1,12 @@
-import { ArrowLeft, Crown, Sparkles, Zap, Check } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from "lucide-react";
+import { useRef, useState } from "react";
+import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { createPayment, verifyPayment } from "../features/payment";
+import { me } from "../features/me";
+import { setUserData } from "../redux/userSlice";
+import { getErrorMessage } from "../utils/errors";
 
 const plans = [
   {
@@ -64,37 +69,156 @@ const plans = [
   },
 ];
 
+const hasValidOrder = (data) =>
+  typeof data?.key_id === "string" &&
+  data.key_id.length > 0 &&
+  typeof data.order?.id === "string" &&
+  data.order.id.length > 0 &&
+  Number.isFinite(Number(data.order.amount));
+
 function Plan() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const attemptRef = useRef(0);
+  const processingRef = useRef(false);
+  const [processingPlan, setProcessingPlan] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+
   const handlePayment = async (plan) => {
+    if (
+      plan.key === "free" ||
+      plan.current ||
+      processingPlan ||
+      processingRef.current
+    ) {
+      return;
+    }
+
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
+    processingRef.current = true;
+    const isCurrentAttempt = () => attemptRef.current === attempt;
+    const finishAttempt = () => {
+      if (!isCurrentAttempt()) return;
+      processingRef.current = false;
+      setProcessingPlan(null);
+    };
+
+    setProcessingPlan(plan.key);
+    setPaymentStatus("Creating your secure payment order…");
+    setPaymentError("");
+
     try {
-      if (plan.key == "free" || plan.current) return;
-      const data = await createPayment(plan.key)
-      console.log(data)
-      const options = {
-        key: data.key_id,
-        amount: data.order.amount,
-        currency: data.order.currency || "INR",
+      if (
+        typeof window === "undefined" ||
+        typeof window.Razorpay !== "function"
+      ) {
+        throw new Error("Payment checkout is currently unavailable.");
+      }
+
+      const orderData = await createPayment(plan.key);
+      if (!hasValidOrder(orderData)) {
+        throw new Error("The payment order response was invalid. Please try again.");
+      }
+
+      const handleVerification = async (response) => {
+        if (!isCurrentAttempt()) return;
+
+        setPaymentStatus("Verifying your payment…");
+        setPaymentError("");
+
+        try {
+          const verification = await verifyPayment({
+            razorpay_order_id: response?.razorpay_order_id,
+            razorpay_payment_id: response?.razorpay_payment_id,
+            razorpay_signature: response?.razorpay_signature,
+          });
+
+          if (!verification || typeof verification.message !== "string") {
+            throw new Error("The payment verification response was invalid.");
+          }
+
+          if (!isCurrentAttempt()) return;
+
+          setPaymentStatus(
+            verification.credits
+              ? `Payment verified successfully. ${verification.credits} AI credits were added.`
+              : verification.message,
+          );
+
+          try {
+            const refreshedUser = await me();
+            if (!isCurrentAttempt()) return;
+
+            if (refreshedUser) {
+              dispatch(setUserData(refreshedUser));
+            } else {
+              setPaymentError(
+                "Payment was verified, but your credit balance could not be refreshed. Reload the page to see the latest balance.",
+              );
+            }
+          } catch (refreshError) {
+            if (!isCurrentAttempt()) return;
+            setPaymentError(
+              `Payment was verified, but your credit balance could not be refreshed. ${getErrorMessage(refreshError, "Reload the page to see the latest balance.")}`,
+            );
+          }
+        } catch (error) {
+          if (!isCurrentAttempt()) return;
+          setPaymentStatus("");
+          setPaymentError(
+            getErrorMessage(
+              error,
+              "Unable to verify the payment. Please contact support before trying again.",
+            ),
+          );
+        } finally {
+          finishAttempt();
+        }
+      };
+
+      const razorpay = new window.Razorpay({
+        key: orderData.key_id,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency || "INR",
         name: "Dev-Verse Studio",
         description: `Plan ${plan.name}`,
-        order_id: data.order.id,
-        handler: async (response) => {
-          const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response
-          const data = await verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature })
-          console.log(data)
+        order_id: orderData.order.id,
+        handler: handleVerification,
+        modal: {
+          ondismiss: () => {
+            if (!isCurrentAttempt()) return;
+            setPaymentStatus("Payment cancelled. You can try again whenever you’re ready.");
+            setPaymentError("");
+            finishAttempt();
+          },
         },
         theme: {
-          color: "#4f46e5"
-        }
+          color: "#4f46e5",
+        },
+      });
 
+      if (typeof razorpay.on === "function") {
+        razorpay.on("payment.failed", () => {
+          if (!isCurrentAttempt()) return;
+          setPaymentStatus("");
+          setPaymentError("Payment could not be completed. Please try again.");
+          finishAttempt();
+        });
       }
-      const razorpay = new window.Razorpay(options)
-      razorpay.open()
-    } catch (error) {
-      console.log(error)
 
+      setPaymentStatus("Opening secure checkout…");
+      razorpay.open();
+    } catch (error) {
+      if (!isCurrentAttempt()) return;
+      setPaymentStatus("");
+      setPaymentError(
+        getErrorMessage(error, "Unable to start payment. Please try again."),
+      );
+      finishAttempt();
     }
-  }
+  };
   return (
     <div className="min-h-screen bg-slate-50 px-5 py-8 text-slate-900 dark:bg-[#07070c] dark:text-white">
       <div className="pointer-events-none fixed left-1/2 top-0 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-indigo-500/[0.08] blur-[140px]" />
@@ -123,9 +247,34 @@ function Plan() {
             iterate faster.
           </p>
         </div>
+
+        {(paymentStatus || paymentError) && (
+          <div className="mx-auto mb-6 max-w-2xl space-y-2 text-sm">
+            {paymentStatus && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center justify-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-indigo-700 dark:text-indigo-200"
+              >
+                {processingPlan && <Loader2 size={15} className="animate-spin" />}
+                <span>{paymentStatus}</span>
+              </div>
+            )}
+            {paymentError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-center text-red-700 dark:text-red-200"
+              >
+                {paymentError}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-5 md:grid-cols-3">
           {plans.map((plan, index) => {
             const Icon = plan.icon;
+            const isProcessing = processingPlan === plan.key;
             return (
               <motion.div
                 key={plan.name}
@@ -156,14 +305,29 @@ function Plan() {
                 </div>
 
 
-                <button onClick={() => handlePayment(plan)} className={`mt-5 w-full rounded-lg py-2.5 text-xs font-semibold transition ${plan.current ? "cursor-default bg-slate-100 text-slate-400 dark:bg-white/[0.06] dark:text-slate-500 " : plan.popular ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 " : "bg-slate-900 text-white hover:opacity-90 dark:bg-white dark:text-slate-900 "}`}>{plan.button}
+                <button
+                  type="button"
+                  onClick={() => void handlePayment(plan)}
+                  disabled={plan.current || Boolean(processingPlan)}
+                  aria-busy={isProcessing}
+                  className={`mt-5 w-full rounded-lg py-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${plan.current ? "cursor-default bg-slate-100 text-slate-400 dark:bg-white/[0.06] dark:text-slate-500" : plan.popular ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500" : "bg-slate-900 text-white hover:opacity-90 dark:bg-white dark:text-slate-900"}`}
+                >
+                  {isProcessing ? "Processing…" : plan.button}
                 </button>
 
                 <div className="mt-6 border-t border-slate-200 pt-5 dark:border-white/[0.07]">
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400" >Includes</p>
-                  <ul className="space-y-3">{plan.features.map((feature) => (
-                    <li className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300"><Check size={14} className="mt-0.5 shrink-0 text-emerald-500" /><span>{feature}</span></li>
-                  ))}</ul>
+                  <ul className="space-y-3">
+                    {plan.features.map((feature) => (
+                      <li
+                        key={`${plan.key}-${feature}`}
+                        className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300"
+                      >
+                        <Check size={14} className="mt-0.5 shrink-0 text-emerald-500" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
 
