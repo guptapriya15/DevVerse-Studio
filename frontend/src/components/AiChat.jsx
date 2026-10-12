@@ -44,6 +44,46 @@ const TOOL_DETAIL = {
 };
 
 const MAX_HISTORY = 20;
+const MAX_STORED_MESSAGES = 100;
+
+const getChatStorageKey = (projectId) =>
+  projectId ? `devverse:ai-chat:${projectId}` : null;
+
+const readStoredMessages = (projectId) => {
+  const storageKey = getChatStorageKey(projectId);
+  if (!storageKey || typeof window === "undefined") return [];
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(storageKey));
+    if (!Array.isArray(stored)) return [];
+
+    return stored
+      .filter(
+        (item) =>
+          item &&
+          ["user", "assistant", "tool"].includes(item.role),
+      )
+      .map((item) => {
+        if (item.role === "tool") {
+          return {
+            role: "tool",
+            toolType: item.toolType,
+            detail: item.detail,
+          };
+        }
+
+        return {
+          role: item.role,
+          content: typeof item.content === "string" ? item.content : "",
+          ...(item.error ? { error: true } : {}),
+        };
+      })
+      .filter((item) => item.role === "tool" || item.content)
+      .slice(-MAX_STORED_MESSAGES);
+  } catch {
+    return [];
+  }
+};
 
 const ToolBadge = ({ toolType, detail }) => {
   const meta = TOOL_META[toolType];
@@ -65,7 +105,7 @@ const ToolBadge = ({ toolType, detail }) => {
 };
 
 function AiChat({ projectId, reloadTree }) {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => readStoredMessages(projectId));
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const needsReload = useRef(false);
@@ -75,6 +115,20 @@ function AiChat({ projectId, reloadTree }) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    const storageKey = getChatStorageKey(projectId);
+    if (!storageKey || typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)),
+      );
+    } catch {
+      // Chat history still works for the current session if storage is blocked.
+    }
+  }, [messages, projectId]);
 
   // Handles one parsed server event. Throws on `error` events so the caller's
   // try/catch can show the problem to the user.
