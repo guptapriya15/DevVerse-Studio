@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 import { me } from "./features/me";
 import Dashboard from "./pages/Dashboard";
+import LandingPage from "./pages/LandingPage";
 import { setAuthError, setAuthLoading, setUserData } from "./redux/userSlice";
 import ProjectPage from "./pages/ProjectPage";
 import Plan from "./pages/Plan";
@@ -50,7 +51,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/project/:id" element={<ProjectRoute />} />
         <Route path="/plan" element={<Plan />} />
       </Routes>

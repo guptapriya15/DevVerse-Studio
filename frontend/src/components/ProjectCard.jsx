@@ -51,7 +51,7 @@ function ProjectCard({ project, onChanged }) {
       whileHover={{ y: -3 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
       onClick={() => {
-        navigate(`project/${project._id}`);
+        navigate(`/project/${project._id}`);
       }}
       className="group relative rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:border-white/[0.07] dark:bg-white/[0.03] dark:shadow-none dark:hover:border-white/[0.14] dark:hover:bg-white/[0.045]"
     >
