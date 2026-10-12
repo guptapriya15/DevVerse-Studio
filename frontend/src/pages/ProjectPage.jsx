@@ -46,21 +46,71 @@ const patchNode = (nodes, id, patch) =>
     return node;
   });
 
+const PANEL_STATE_KEY = "devverse:workspace-panels";
+const DEFAULT_PANEL_STATE = {
+  showExplorer: true,
+  showAiChat: true,
+  showBottomPanel: true,
+};
+
+const readPanelState = () => {
+  if (typeof window === "undefined") return DEFAULT_PANEL_STATE;
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PANEL_STATE_KEY));
+    if (!stored || typeof stored !== "object") return DEFAULT_PANEL_STATE;
+
+    return {
+      showExplorer:
+        typeof stored.showExplorer === "boolean"
+          ? stored.showExplorer
+          : DEFAULT_PANEL_STATE.showExplorer,
+      showAiChat:
+        typeof stored.showAiChat === "boolean"
+          ? stored.showAiChat
+          : DEFAULT_PANEL_STATE.showAiChat,
+      showBottomPanel:
+        typeof stored.showBottomPanel === "boolean"
+          ? stored.showBottomPanel
+          : DEFAULT_PANEL_STATE.showBottomPanel,
+    };
+  } catch {
+    return DEFAULT_PANEL_STATE;
+  }
+};
+
 function ProjectPage() {
   const { id } = useParams();
-  const [showExplorer, setShowExplorer] = useState(true);
-  const [showAiChat, setShowAiChat] = useState(true);
+  const [showExplorer, setShowExplorer] = useState(
+    () => readPanelState().showExplorer,
+  );
+  const [showAiChat, setShowAiChat] = useState(
+    () => readPanelState().showAiChat,
+  );
+  const [showBottomPanel, setShowBottomPanel] = useState(
+    () => readPanelState().showBottomPanel,
+  );
   const [showPreview, setShowPreview] = useState(false);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [tree, setTree] = useState([]);
   const [mobilePane, setMobilePane] = useState("explorer");
   const [openTabs, setOpenTabs] = useState([]);
   const [activeTab, setActiveTab] = useState(null);
-  const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [pageError, setPageError] = useState(null);
   const [dirtyFileIds, setDirtyFileIds] = useState([]);
   const [deletedFileIds, setDeletedFileIds] = useState([]);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        PANEL_STATE_KEY,
+        JSON.stringify({ showExplorer, showAiChat, showBottomPanel }),
+      );
+    } catch {
+      // Storage can be unavailable in private or restricted browser contexts.
+    }
+  }, [showAiChat, showBottomPanel, showExplorer]);
 
   const reloadTree = useCallback(async () => {
     try {

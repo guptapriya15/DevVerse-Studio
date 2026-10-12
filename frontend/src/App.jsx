@@ -1,11 +1,16 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 import { me } from "./features/me";
 import Dashboard from "./pages/Dashboard";
 import { setAuthError, setAuthLoading, setUserData } from "./redux/userSlice";
 import ProjectPage from "./pages/ProjectPage";
 import Plan from "./pages/Plan";
+
+function ProjectRoute() {
+  const { id } = useParams();
+  return <ProjectPage key={id} />;
+}
 
 function App() {
   const dispatch = useDispatch();
@@ -46,7 +51,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/project/:id" element={<ProjectPage />} />
+        <Route path="/project/:id" element={<ProjectRoute />} />
         <Route path="/plan" element={<Plan />} />
       </Routes>
     </BrowserRouter>

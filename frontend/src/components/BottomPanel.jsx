@@ -5,10 +5,12 @@ import { useSelector } from "react-redux";
 
 function BottomPanel({ projectId, onClose }) {
   const currentProject = useSelector((state) => state.project.currentProject);
+  const projectReady =
+    !projectId || currentProject?._id === projectId;
 
   const terminalProjectId = projectId || currentProject?._id;
 
-  const userId = currentProject?.owner;
+  const userId = projectReady ? currentProject?.owner : null;
 
   if (!terminalProjectId || !userId) {
     return null;
