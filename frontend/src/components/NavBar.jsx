@@ -74,7 +74,7 @@ const NavBar = () => {
   };
 
   return (
-    <div className="flex h-16 w-full items-center gap-6 border-b border-slate-200 bg-white/70 px-6 font-sans backdrop-blur-xl transition-colors duration-300 dark:border-white/[0.07] dark:bg-white/[0.03]">
+    <div className="relative z-40 flex h-16 w-full items-center gap-6 border-b border-slate-200 bg-white/70 px-6 font-sans backdrop-blur-xl transition-colors duration-300 dark:border-white/[0.07] dark:bg-white/[0.03]">
       <div className="flex shrink-0 items-center gap-2.5">
         <span className="text-[17px] font-bold tracking-tight text-slate-900 dark:text-white">
           Dev-Verse Studio
@@ -116,7 +116,7 @@ const NavBar = () => {
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-slate-200 bg-white/95 py-1.5 shadow-xl backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#12121c]/95"
+              className="absolute right-0 z-[100] mt-2 w-52 rounded-xl border border-slate-200 bg-white/95 py-1.5 shadow-xl backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#12121c]/95"
             >
               <div className="flex items-center gap-2.5 border-b border-slate-100 px-3.5 py-2.5 dark:border-white/[0.06]">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-700 ring-1 ring-black/5 dark:from-slate-200 dark:to-white dark:ring-white/20">
